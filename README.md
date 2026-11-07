@@ -14,7 +14,11 @@ us-west-2:my-db-backups-west,us-east-1:my-db-backups-east
 
 The first entry is the stream target: the job runs `pg_dump`, gzips it, and uploads directly to that bucket. Each remaining target receives a copy of the same object key via S3→S3 (no second dump, no large temp file on the cron disk). Put the region closest to your database first.
 
-Your IAM user/role needs permission to create/configure buckets (if auto-create is used), list and put objects on every target bucket, and get objects from the first (primary) bucket so copies can run.
+Objects are stored as flat keys: `backup-YYYY-MM-DD-HH-MM-SS.sql.gz`.
+
+After each successful upload or copy, the job keeps the newest `BACKUP_RETENTION_COUNT` backups in that bucket (default `7`) and permanently deletes older `backup-*.sql.gz` objects, including all object versions and delete markers. Legacy nested keys (`YYYY/MM/DD/...`) are not managed; remove those yourself if present.
+
+Your IAM user/role needs permission to create/configure buckets (if auto-create is used), and on every target bucket: list objects and versions, put/get/delete objects and object versions. The primary bucket also needs get so copies can run. In IAM terms that typically includes `s3:ListBucket`, `s3:ListBucketVersions`, `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, and `s3:DeleteObjectVersion`.
 
 A single `region:bucket` pair is valid if you only need one region.
 

@@ -16,6 +16,9 @@ services:
       # us-west-2:my-db-backups-west,us-east-1:my-db-backups-east
       - key: S3_TARGETS
         sync: false
+      # How many backup-*.sql.gz objects to keep per bucket (oldest pruned)
+      - key: BACKUP_RETENTION_COUNT
+        value: "7"
       # Looks like "AKIAXXXXXXXXXXXXXXXX"
       - key: AWS_ACCESS_KEY_ID
         sync: false
