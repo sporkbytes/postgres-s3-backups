@@ -12,20 +12,18 @@ services:
         fromDatabase:
           name: replace-with-your-postgres-instance-name
           property: connectionString
-      # pick the region closest to your database
-      # For example, us-west-2 for the Oregon region
-      - key: AWS_REGION
-        sync: false 
-      # A globally unique name for your bucket
-      # For example, <your-username>-<database name>-render-postgres-backups
-      - key: S3_BUCKET_NAME
+      # Comma-separated region:bucket pairs. Put the region closest to your
+      # database first (that target receives the streamed dump; others are
+      # copied from it). Example:
+      # us-west-2:my-db-backups-west,us-east-1:my-db-backups-east
+      - key: S3_TARGETS
         sync: false
       # Looks like "AKIAXXXXXXXXXXXXXXXX"
       - key: AWS_ACCESS_KEY_ID
         sync: false
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
-      # Postgres version of your Postgres instance 
+      # Postgres version of your Postgres instance
       # For example, 16
       - key: POSTGRES_VERSION
         sync: false
@@ -33,4 +31,3 @@ services:
       # For example, 3.20
       - key: ALPINE_VERSION
         sync: false
-
