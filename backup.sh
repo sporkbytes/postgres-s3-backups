@@ -15,6 +15,11 @@ trim() {
 }
 
 parse_targets() {
+    local old_ifs
+    local pair
+    local region
+    local bucket
+
     if [ -z "${S3_TARGETS:-}" ]; then
         echo "S3_TARGETS is required (comma-separated region:bucket pairs)" >&2
         exit 1
@@ -82,28 +87,28 @@ target_bucket() {
 }
 
 s3() {
-    region=$1
+    local region=$1
     shift
     aws s3 --region "$region" "$@"
 }
 
 s3api() {
-    region=$1
-    bucket=$2
-    action=$3
+    local region=$1
+    local bucket=$2
+    local action=$3
     shift 3
     aws s3api "$action" --region "$region" --bucket "$bucket" "$@"
 }
 
 bucket_exists() {
-    region=$1
-    bucket=$2
+    local region=$1
+    local bucket=$2
     s3 "$region" ls "s3://$bucket" >/dev/null 2>&1
 }
 
 create_bucket() {
-    region=$1
-    bucket=$2
+    local region=$1
+    local bucket=$2
 
     echo "Bucket $bucket doesn't exist in $region. Creating it now..."
 
@@ -129,8 +134,8 @@ create_bucket() {
 }
 
 ensure_bucket_exists() {
-    region=$1
-    bucket=$2
+    local region=$1
+    local bucket=$2
     if bucket_exists "$region" "$bucket"; then
         return
     fi
@@ -138,7 +143,7 @@ ensure_bucket_exists() {
 }
 
 ensure_all_buckets_exist() {
-    i=1
+    local i=1
     while [ "$i" -le "$TARGET_COUNT" ]; do
         ensure_bucket_exists "$(target_region "$i")" "$(target_bucket "$i")"
         i=$((i + 1))
@@ -150,20 +155,20 @@ pg_dump_database() {
 }
 
 upload_to_bucket() {
-    region=$1
-    bucket=$2
-    object_key=$3
+    local region=$1
+    local bucket=$2
+    local object_key=$3
     # if the zipped backup file is larger than 50 GB add the --expected-size option
     # see https://docs.aws.amazon.com/cli/latest/reference/s3/cp.html
     s3 "$region" cp - "s3://$bucket/$object_key"
 }
 
 copy_object() {
-    src_region=$1
-    src_bucket=$2
-    dst_region=$3
-    dst_bucket=$4
-    object_key=$5
+    local src_region=$1
+    local src_bucket=$2
+    local dst_region=$3
+    local dst_bucket=$4
+    local object_key=$5
 
     echo "Copying backup to s3://$dst_bucket/$object_key ($dst_region)..."
     # Destination --region; CLI performs cross-region copy without a full local file
@@ -175,7 +180,7 @@ copy_object() {
 }
 
 retention_count() {
-    count=${BACKUP_RETENTION_COUNT:-7}
+    local count=${BACKUP_RETENTION_COUNT:-7}
     case "$count" in
         ''|*[!0-9]*)
             echo "BACKUP_RETENTION_COUNT must be a positive integer (got '$count')" >&2
@@ -191,9 +196,12 @@ retention_count() {
 
 # Permanently delete every version and delete marker for a key.
 delete_all_versions() {
-    region=$1
-    bucket=$2
-    object_key=$3
+    local region=$1
+    local bucket=$2
+    local object_key=$3
+    local version_ids
+    local delete_marker_ids
+    local version_id
 
     # Filter to the exact key (prefix listing can return longer key names).
     # JMESPath string literals use backticks.
@@ -230,8 +238,9 @@ EOF
 }
 
 list_backup_keys() {
-    region=$1
-    bucket=$2
+    local region=$1
+    local bucket=$2
+    local listing
 
     # aws s3 ls exits 1 when nothing matches; treat that as an empty list.
     listing=$(s3 "$region" ls "s3://$bucket/backup-" 2>/dev/null) || true
@@ -243,8 +252,14 @@ list_backup_keys() {
 }
 
 prune_old_backups() {
-    region=$1
-    bucket=$2
+    local region=$1
+    local bucket=$2
+    local keep
+    local keys
+    local total
+    local index
+    local key
+
     keep=$(retention_count)
 
     keys=$(list_backup_keys "$region" "$bucket" | sort -r)
@@ -277,6 +292,13 @@ EOF
 }
 
 main() {
+    local object_key
+    local primary_region
+    local primary_bucket
+    local i
+    local dst_region
+    local dst_bucket
+
     parse_targets
     # Validate early so a bad env fails before dump/upload.
     retention_count >/dev/null
